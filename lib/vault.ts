@@ -10,7 +10,7 @@ export const ECPair = ECPairFactory(ecc);
 /** Mutinynet uses the testnet/signet bech32 HRP (`tb1...`). */
 export const NETWORK = bitcoin.networks.testnet;
 
-export const DELAY_BLOCKS = 10;          // ~5 min on mutinynet (30s blocks)
+export const DELAY_BLOCKS = 3;           // ~1.5 min on mutinynet (30s blocks) — demo-friendly
 export const DEFAULT_FEE_SATS = 200n;    // generous absolute fee per tx
 export const UNVAULT_SEQUENCE = 0xfffffffe;
 export const TX_VERSION = 2;

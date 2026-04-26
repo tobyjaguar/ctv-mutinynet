@@ -41,6 +41,8 @@ interface PersistedState {
   coldAddress: string;
   vaultAddress: string;
   triggerAddress: string;
+  /** CSV delay baked into this vault's on-chain script. May be undefined for vaults created before this field existed — treat as 10 (the prior default). */
+  delay?: number;
   fundingTxid?: string;
   fundingVout?: number;
   fundingValue?: string;
@@ -49,6 +51,8 @@ interface PersistedState {
   finalTxid?: string;
   finalKind?: 'complete' | 'panic';
 }
+
+const LEGACY_DELAY = 10;
 
 function loadState(): PersistedState | null {
   if (typeof window === 'undefined') return null;
@@ -114,10 +118,12 @@ export default function Home() {
     [],
   );
 
+  const vaultDelay = state?.delay ?? LEGACY_DELAY;
+
   const targetHeight = useMemo(() => {
     if (!state?.triggerConfirmedHeight) return null;
-    return state.triggerConfirmedHeight + DELAY_BLOCKS;
-  }, [state?.triggerConfirmedHeight]);
+    return state.triggerConfirmedHeight + vaultDelay;
+  }, [state?.triggerConfirmedHeight, vaultDelay]);
 
   const blocksRemaining = useMemo(() => {
     if (targetHeight === null || tip === null) return null;
@@ -208,6 +214,7 @@ export default function Home() {
         amountSats,
         hotAddress,
         panicPubkey: panic.pubkey,
+        delay: DELAY_BLOCKS,
       });
       setState(() => ({
         amountSats: amountSats.toString(),
@@ -216,6 +223,7 @@ export default function Home() {
         coldAddress: cold,
         vaultAddress: bp.vaultAddress,
         triggerAddress: bp.triggerAddress,
+        delay: bp.params.delay,
       }));
     },
     [setState],
@@ -227,6 +235,7 @@ export default function Home() {
       amountSats: BigInt(s.amountSats),
       hotAddress: s.hotAddress,
       panicPubkey: Buffer.from(panicKey.publicKey),
+      delay: s.delay ?? LEGACY_DELAY,
     });
   }, []);
 
@@ -326,7 +335,7 @@ export default function Home() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">BitVault</h1>
             <p className="text-sm text-zinc-500">
-              CTV vault on Mutinynet · CSV delay: {DELAY_BLOCKS} blocks (~{Math.round((DELAY_BLOCKS * 30) / 60)} min)
+              CTV vault on Mutinynet · CSV delay: {vaultDelay} blocks (~{Math.max(1, Math.round((vaultDelay * 30) / 60))} min)
             </p>
           </div>
           {state && (
