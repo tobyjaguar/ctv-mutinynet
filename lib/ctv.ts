@@ -16,8 +16,11 @@ function writeInt32LE(n: number): Buffer {
 }
 
 function writeUInt64LE(n: bigint): Buffer {
+  // Avoid Buffer.writeBigUInt64LE — missing in some browser polyfills.
   const b = Buffer.alloc(8);
-  b.writeBigUInt64LE(n, 0);
+  const mask = 0xffffffffn;
+  b.writeUInt32LE(Number(n & mask), 0);
+  b.writeUInt32LE(Number((n >> 32n) & mask), 4);
   return b;
 }
 
