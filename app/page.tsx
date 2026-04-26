@@ -66,18 +66,29 @@ function saveState(s: PersistedState | null) {
   else window.localStorage.removeItem(STORAGE_KEY);
 }
 
-async function preflight(rawHex: string): Promise<{ allowed: boolean; reason?: string }> {
+type PreflightOutcome =
+  | { kind: 'allowed' }
+  | { kind: 'rejected'; reason: string }
+  | { kind: 'unavailable'; error: string };
+
+async function preflight(rawHex: string): Promise<PreflightOutcome> {
   const res = await fetch('/api/preflight', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ rawHex }),
   });
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `preflight HTTP ${res.status}`);
+  const data = (await res.json().catch(() => ({}))) as
+    | { kind: 'result'; result: { allowed: boolean; ['reject-reason']?: string } }
+    | { kind: 'unavailable'; error: string }
+    | { kind: 'error'; error: string };
+  if (!res.ok || data.kind === 'error') {
+    throw new Error(('error' in data && data.error) || `preflight HTTP ${res.status}`);
   }
-  const data = (await res.json()) as { allowed: boolean; ['reject-reason']?: string };
-  return { allowed: data.allowed, reason: data['reject-reason'] };
+  if (data.kind === 'unavailable') {
+    return { kind: 'unavailable', error: data.error };
+  }
+  if (data.result.allowed) return { kind: 'allowed' };
+  return { kind: 'rejected', reason: data.result['reject-reason'] ?? 'unknown' };
 }
 
 export default function Home() {
@@ -219,6 +230,20 @@ export default function Home() {
     });
   }, []);
 
+  const runPreflight = useCallback(
+    async (label: string, hex: string, setBusyMsg: (m: string) => void) => {
+      const outcome = await preflight(hex);
+      if (outcome.kind === 'rejected') {
+        throw new Error(`Mempool rejected ${label}: ${outcome.reason}`);
+      }
+      if (outcome.kind === 'unavailable') {
+        console.warn(`preflight unavailable for ${label} (${outcome.error}); broadcasting anyway`);
+        setBusyMsg(`Preflight unavailable, broadcasting ${label}…`);
+      }
+    },
+    [],
+  );
+
   const handleUnvault = useCallback(async () => {
     if (!state?.fundingTxid || state.fundingVout === undefined) return;
     setError(null);
@@ -227,8 +252,7 @@ export default function Home() {
       const bp = rebuildBlueprint(state);
       const tx = buildUnvaultTx(bp, { txid: state.fundingTxid, vout: state.fundingVout });
       const hex = tx.toHex();
-      const pre = await preflight(hex);
-      if (!pre.allowed) throw new Error(`Mempool rejected unvault: ${pre.reason ?? 'unknown'}`);
+      await runPreflight('unvault', hex, setBusy);
       const txid = await broadcastTx(hex);
       setState((prev) => (prev ? { ...prev, unvaultTxid: txid } : prev));
     } catch (e) {
@@ -236,7 +260,7 @@ export default function Home() {
     } finally {
       setBusy(null);
     }
-  }, [state, rebuildBlueprint, setState]);
+  }, [state, rebuildBlueprint, setState, runPreflight]);
 
   const handleComplete = useCallback(async () => {
     if (!state?.unvaultTxid) return;
@@ -246,8 +270,7 @@ export default function Home() {
       const bp = rebuildBlueprint(state);
       const tx = buildCompleteTx(bp, { txid: state.unvaultTxid, vout: 0 });
       const hex = tx.toHex();
-      const pre = await preflight(hex);
-      if (!pre.allowed) throw new Error(`Mempool rejected complete: ${pre.reason ?? 'unknown'}`);
+      await runPreflight('complete', hex, setBusy);
       const txid = await broadcastTx(hex);
       setState((prev) => (prev ? { ...prev, finalTxid: txid, finalKind: 'complete' } : prev));
     } catch (e) {
@@ -255,7 +278,7 @@ export default function Home() {
     } finally {
       setBusy(null);
     }
-  }, [state, rebuildBlueprint, setState]);
+  }, [state, rebuildBlueprint, setState, runPreflight]);
 
   const handlePanic = useCallback(async () => {
     if (!state?.unvaultTxid) return;
@@ -272,8 +295,7 @@ export default function Home() {
         panicKey,
       });
       const hex = tx.toHex();
-      const pre = await preflight(hex);
-      if (!pre.allowed) throw new Error(`Mempool rejected panic: ${pre.reason ?? 'unknown'}`);
+      await runPreflight('panic', hex, setBusy);
       const txid = await broadcastTx(hex);
       setState((prev) => (prev ? { ...prev, finalTxid: txid, finalKind: 'panic' } : prev));
     } catch (e) {
@@ -281,7 +303,7 @@ export default function Home() {
     } finally {
       setBusy(null);
     }
-  }, [state, rebuildBlueprint, setState]);
+  }, [state, rebuildBlueprint, setState, runPreflight]);
 
   const reset = useCallback(() => {
     if (typeof window !== 'undefined' && !window.confirm('Reset vault state? This cannot be undone.')) {
