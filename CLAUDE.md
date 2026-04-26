@@ -61,5 +61,5 @@ The scaffold is Next.js 16 (App Router), newer than most training data. `AGENTS.
 | Faucet | `https://faucet.mutinynet.com/` |
 | RPC facade (preflight only) | `http://3.231.31.216:3000` (`/openapi.json` lists routes) |
 
-Block time ≈ 30s, so a 10-block CSV ≈ 5 minutes — perfect for a live demo.
+Block time ≈ 30s, so the default 3-block CSV ≈ 1.5 minutes — tuned for a punchy live demo.
 

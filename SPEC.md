@@ -113,7 +113,7 @@ Plus two regular P2WPKH addresses: hot `D` (eventual destination) and cold `C` (
 | **Complete** Tx2 | U → D | `[OP_TRUE, <trigger_witness_script>]` | None (CTV + CSV) |
 | **Panic** Tx3 | U → C | `[<sig>, OP_FALSE, <trigger_witness_script>]` | Panic key |
 
-Tx2 **must** have `nSequence = delay` (= 10) on the input or CSV fails.
+Tx2 **must** have `nSequence = delay` (= 3, by default) on the input or CSV fails.
 
 ### BIP-119 hash (the hardest bit, already done)
 
@@ -136,7 +136,7 @@ const network = bitcoin.networks.testnet; // signet uses testnet bech32 HRP
 
 | Const | Value | File |
 |---|---|---|
-| `DELAY_BLOCKS` | `10` | `lib/vault.ts` |
+| `DELAY_BLOCKS` | `3` | `lib/vault.ts` |
 | `DEFAULT_FEE_SATS` | `200n` | `lib/vault.ts` |
 | `UNVAULT_SEQUENCE` | `0xfffffffe` | `lib/vault.ts` |
 | `TX_VERSION` | `2` | `lib/vault.ts` |
@@ -151,9 +151,9 @@ const network = bitcoin.networks.testnet; // signet uses testnet bech32 HRP
 >
 > **1:00** — *Open faucet, send 100k sats.* "Funding now. Mutinynet has 30-second blocks…" *Wait for confirmation.* "…confirmed."
 >
-> **1:30** — *Click "Unvault."* "I just broadcast a transaction that no one signed. CTV enforced where the money had to go: an intermediate address with a 10-block timelock. Watch the counter."
+> **1:30** — *Click "Unvault."* "I just broadcast a transaction that no one signed. CTV enforced where the money had to go: an intermediate address with a 3-block timelock. Watch the counter."
 >
-> **2:00** — *Counter ticks.* "Imagine an attacker just compromised my hot wallet and triggered this withdrawal. I have 5 minutes to react."
+> **2:00** — *Counter ticks.* "Imagine an attacker just compromised my hot wallet and triggered this withdrawal. I have ~90 seconds to react."
 >
 > **3:00** — *Click "Panic."* "Funds in my cold address. Attacker got nothing. No multisig coordination, no on-chain governance, no executor contract — just a UTXO that knew the rules."
 >
